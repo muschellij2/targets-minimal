@@ -10,6 +10,11 @@
 #' create_plot(data)
 create_plot <- function(data) {
   ggplot(data) +
-    geom_histogram(aes(x = Ozone), bins = 12) +
+    geom_line(aes(x = date, y = users)) +
     theme_gray(24)
+}
+
+
+read_db <- function(database_update_time, bq_tbl) {
+  bigrquery::bq_table_download(bq_tbl)
 }

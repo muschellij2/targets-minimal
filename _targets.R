@@ -1,24 +1,49 @@
 library(targets)
 library(tarchetypes)
 source("R/functions.R")
+source("R/authorize_bq.R")
+project = "streamline-resources"
+dataset = "google_analytics_raw"
+table = "google_analytics_users"
+bq_tbl = bigrquery::bq_table(project, dataset, table)
+bq_tbl2 = bigrquery::bq_table(project, "covid_jhu", "covid_jhu_cases")
+
 options(tidyverse.quiet = TRUE)
-tar_option_set(packages = c("biglm", "dplyr", "ggplot2", "readr", "tidyr"))
+tar_option_set(packages = c("dplyr", "ggplot2",
+                            "bigrquery"))
+
 list(
   tar_target(
-    raw_data_file,
-    "data/raw_data.csv",
-    format = "file"
+    database_update_time,
+    bigrquery::bq_table_mtime(bq_tbl)
   ),
   tar_target(
     raw_data,
-    read_csv(raw_data_file, col_types = cols())
+    read_db(database_update_time, bq_tbl)
+  ),
+  tar_target(
+    covid_update_time,
+    bigrquery::bq_table_mtime(bq_tbl2)
+  ),
+  tar_target(
+    covid_data,
+    read_db(covid_update_time, bq_tbl2)
   ),
   tar_target(
     data,
     raw_data %>%
-      filter(!is.na(Ozone))
+      arrange(date, latitude)
   ),
-  tar_target(hist, create_plot(data)),
-  tar_target(fit, biglm(Ozone ~ Wind + Temp, data)),
+  tar_target(
+    sum_covid,
+    covid_data %>%
+      group_by(date) %>%
+      summarise(cases = sum(cases, na.rm = TRUE))
+  ),
+  tar_target(
+    both_data,
+    left_join(data, sum_covid)
+  ),
+  tar_target(scatter, create_plot(data)),
   tar_render(report, "index.Rmd")
 )
