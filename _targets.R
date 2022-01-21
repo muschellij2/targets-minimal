@@ -12,16 +12,7 @@ options(tidyverse.quiet = TRUE)
 tar_option_set(packages = c("dplyr", "ggplot2",
                             "bigrquery"))
 
-bq_table_mtime =
-  if ("bq_table_mtime" %in% names(asNamespace("bigrquery"))) {
-    bigrquery::bq_table_mtime
-  } else {
-    function(x) {
-      meta = bigrquery::bq_table_meta(x = x, fields = "lastModifiedTime")
-      as.POSIXct(as.double(meta$lastModifiedTime)/1000,
-                 origin = "1970-01-01", tz = "UTC")
-    }
-  }
+
 
 list(
   tar_target(
