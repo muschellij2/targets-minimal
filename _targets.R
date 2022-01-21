@@ -12,28 +12,50 @@ options(tidyverse.quiet = TRUE)
 tar_option_set(packages = c("dplyr", "ggplot2",
                             "bigrquery"))
 
+bq_table_mtime =
+  if ("bq_table_mtime" %in% names(asNamespace("bigrquery"))) {
+    bigrquery::bq_table_mtime
+  } else {
+    function(x) {
+      meta = bigrquery::bq_table_meta(x = x, fields = "lastModifiedTime")
+      as.POSIXct(as.double(meta$lastModifiedTime)/1000,
+                 origin = "1970-01-01", tz = "UTC")
+    }
+  }
+
 list(
   tar_target(
     database_update_time,
-    bigrquery::bq_table_mtime(bq_tbl)
+    bq_table_mtime(bq_tbl)
   ),
   tar_target(
     raw_data,
-    read_db(database_update_time, bq_tbl)
+    connect_bq(database_update_time, bq_tbl)
   ),
   tar_target(
     covid_update_time,
-    bigrquery::bq_table_mtime(bq_tbl2)
+    bq_table_mtime(bq_tbl2)
   ),
   tar_target(
     covid_data,
-    read_db(covid_update_time, bq_tbl2)
+    connect_bq(covid_update_time, bq_tbl2)
   ),
   tar_target(
     data,
     raw_data %>%
       arrange(date, latitude)
   ),
+  ##### I need *STORED* data (aka a data.frame)
+  # tar_target(
+  #   dataframe,
+  #   data %>%
+  #     dplyr::collect()
+  # ),
+  # tar_target(
+  #   covid_dataframe,
+  #   covid_data %>%
+  #     dplyr::collect()
+  # ),
   tar_target(
     sum_covid,
     covid_data %>%
@@ -45,5 +67,6 @@ list(
     left_join(data, sum_covid)
   ),
   tar_target(scatter, create_plot(data)),
+  tar_target(data2, print(data)),
   tar_render(report, "index.Rmd")
 )
